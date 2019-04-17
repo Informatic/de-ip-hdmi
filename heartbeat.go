@@ -1,29 +1,29 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
-	"time"
-	"bytes"
-	"encoding/binary"
 	"os"
+	"time"
 )
 
-const HeartbeatPort = 48689;
+const HeartbeatPort = 48689
 
 type SenderHeartbeat struct {
-	_ [27]byte;
-	SignalPresent byte;
-	SignalWidth uint16;
-	SignalHeight uint16;
-	SignalFPS uint16;
-	EncodedWidth uint16;
-	EncodedHeight uint16;
-	_ [2]byte;
-	Uptime uint32;
-	_ [6]byte;
-	ReceiverPresent uint8;
+	_               [27]byte
+	SignalPresent   byte
+	SignalWidth     uint16
+	SignalHeight    uint16
+	SignalFPS       uint16
+	EncodedWidth    uint16
+	EncodedHeight   uint16
+	_               [2]byte
+	Uptime          uint32
+	_               [6]byte
+	ReceiverPresent uint8
 }
 
 func BroadcastHeartbeat(ifname string, senderip string) {
@@ -38,21 +38,29 @@ func BroadcastHeartbeat(ifname string, senderip string) {
 	}
 
 	for {
-		saddr,err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", senderip, HeartbeatPort))
+		saddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", senderip, HeartbeatPort))
 		if err != nil {
-			log.Fatalf("Unable to resolve addr, %s", err.Error())
+			log.Printf("Unable to resolve addr, %s", err.Error())
+			time.Sleep(time.Second)
+			continue
 		}
 		laddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", HeartbeatPort))
 		if err != nil {
-			log.Fatalf("Unable to resolve addr, %s", err.Error())
+			log.Printf("Unable to resolve addr, %s", err.Error())
+			time.Sleep(time.Second)
+			continue
 		}
 		conn, err := net.DialUDP("udp", laddr, saddr)
 		if err != nil {
-			log.Fatalf("Unable to keep broadcasting the keepalives, %s", err.Error())
+			log.Printf("Unable to keep broadcasting the keepalives, %s", err.Error())
+			time.Sleep(time.Second)
+			continue
 		}
 		_, err = conn.Write(packet)
 		if err != nil {
-			log.Fatalf("Unable to keep broadcasting the keepalives, %s", err.Error())
+			log.Printf("Unable to keep broadcasting the keepalives, %s", err.Error())
+			time.Sleep(time.Second)
+			continue
 		}
 		conn.Close()
 		time.Sleep(time.Second)
@@ -74,7 +82,7 @@ func ProcessHeartbeat(data []byte) {
 		// Calculate effective framerate
 		EncodedFramerate := 0
 		if LastFrame > 0 {
-			EncodedFramerate = (TotalFrames - LastFrame) * int(time.Now().Sub(LastFrameTS) / time.Millisecond)
+			EncodedFramerate = (TotalFrames - LastFrame) * int(time.Now().Sub(LastFrameTS)/time.Millisecond)
 		}
 		LastFrame = TotalFrames
 		LastFrameTS = time.Now()
@@ -87,7 +95,7 @@ func ProcessHeartbeat(data []byte) {
 			float32(EncodedFramerate)/1000.0)
 
 		if (EncodedWidth != 0 || EncodedHeight != 0) &&
-				(heartbeat.EncodedWidth != EncodedWidth || heartbeat.EncodedHeight != EncodedHeight) {
+			(heartbeat.EncodedWidth != EncodedWidth || heartbeat.EncodedHeight != EncodedHeight) {
 			// FIXME dirty hack for gstreamer being unable to handle resolution
 			// changes
 			log.Println("Restarting due to format change")
